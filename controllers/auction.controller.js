@@ -51,25 +51,33 @@ const getAuctionById = async (req, res) => {
 }
 
 
-const joinAuction = async (req, res) => {
+// controllers/auction.controller.js
+
+const { broadcastToAuction } = require('./websocket.controller');
+
+joinAuction = async (req, res) => {
+    const { auctionId } = req.body;
+    const userId = req.user.id;
+
     try {
-        const { auctionId } = req.body;
         const auction = await Auction.findById(auctionId);
 
         if (!auction) {
             return res.status(404).send("Auction not found");
         }
 
-        if (auction.participants.includes(req.user._id)) {
-            return res.status(400).send("User already in the auction");
+        // Add user to the auction's participants list
+        if (!auction.participants.includes(userId)) {
+            auction.participants.push(userId);
+            await auction.save();
         }
 
-        auction.participants.push(req.user._id);
-        await auction.save();
+        // Notify the user to join the WebSocket room
+        broadcastToAuction(auctionId, { type: 'join', userId });
 
-        res.send("Successfully joined the auction");
+        res.status(200).send({ message: "Joined auction successfully", auction , auctionId });
     } catch (error) {
-        res.status(422).send(error);
+        res.status(500).send(error.message);
     }
 };
 
@@ -88,95 +96,93 @@ const transporter = nodemailer.createTransport({
 
 
 
-const startAuction = async (req, res) => {
-    const { auctionId } = req.body;
+    startAuction = async (req, res) => {
+        const { auctionId } = req.body;
 
-    try {
-        const auction = await Auction.findById(auctionId);
+        try {
+            const auction = await Auction.findById(auctionId);
 
-        if (!auction) return res.status(404).send("Auction not found");
-        if (auction.isActive) return res.status(400).send("Auction is already active");
+            if (!auction) return res.status(404).send("Auction not found");
+            if (auction.isActive) return res.status(400).send("Auction is already active");
 
-        if (req.user.role !== 'admin') {
-            return res.status(403).send("Only admins can start an auction");
-        }
-        if (auction.participants.length < 2) {
-            return res.status(405).send("Participants number should be at least 2 or higher");
-        }
-
-        auction.isActive = true;
-        await auction.save();
-
-        setTimeout(async () => {
-            try {
-              
-                const auctionToClose = await Auction.findById(auctionId)
-                    .populate({
-                        path: 'bids',
-                        populate: { path: 'user', select: 'email' },
-                    })
-                    .populate({
-                        path: 'participants',
-                        select: 'email',
-                    });
-
-                if (!auctionToClose || !auctionToClose.isActive) {
-                    console.error(`Auction ${auctionId} not found or not active`);
-                    return;
-                }
-
-
-                const highestBid = auctionToClose.bids.sort((a, b) => b.bidAmount - a.bidAmount)[0];
-
-                
-                console.log(
-                    highestBid
-                        ? `Auction ${auctionId} closed. Winner: ${highestBid.user.email}`
-                        : `Auction ${auctionId} closed with no bids.`
-                );
-
-                const participantsEmails = auctionToClose.participants
-                    .map(user => user.email)
-                   
-
-                for (const email of participantsEmails) {
-                    await transporter.sendMail({
-                        from: "admin",
-                        to: email,
-                        subject: 'Auction Results',
-                        text: highestBid
-                            ? `The auction ${auctionToClose.itemName} has ended. Winner: ${highestBid.user.email}, Winning Bid: $${highestBid.bidAmount}`
-                            : `The auction ${auctionToClose.itemName} has ended with no winning bids.`,
-                    });
-                    
-                }
-
-                console.log('Emails sent to all participants.');
-
-                auctionToClose.isActive = false;
-                auctionToClose.highestBidder = highestBid ? highestBid.user : null;
-                auctionToClose.currentPrice = highestBid ? highestBid.bidAmount : auctionToClose.startingPrice;
-
-                auctionToClose.bids = [];
-                auctionToClose.participants = [];
-                auctionToClose.currentPrice = 0;
-                auctionToClose.endTime = auctionToClose.startTime;
-
-                await auctionToClose.save();
-
-            } catch (error) {
-                console.error(`Error closing auction ${auctionId}: ${error.message}`);
+            if (req.user.role !== 'admin') {
+                return res.status(403).send("Only admins can start an auction");
             }
-        }, 40000);
+            if (auction.participants.length < 2) {
+                return res.status(405).send("Participants number should be at least 2 or higher");
+            }
 
-        res.send({ message: "Auction started successfully", auction });
-    } catch (error) {
-        res.status(500).send(error.message);
-    }
-};
+            auction.isActive = true;
+            await auction.save();
 
+            // Notify all participants that the auction has started
+            broadcastToAuction(auctionId, { type: 'start', message: 'Auction started!' });
 
+            setTimeout(async () => {
+                try {
+                    const auctionToClose = await Auction.findById(auctionId)
+                        .populate({
+                            path: 'bids',
+                            populate: { path: 'user', select: 'email' },
+                        })
+                        .populate({
+                            path: 'participants',
+                            select: 'email',
+                        });
 
+                    if (!auctionToClose || !auctionToClose.isActive) {
+                        console.error(`Auction ${auctionId} not found or not active`);
+                        return;
+                    }
+
+                    const highestBid = auctionToClose.bids.sort((a, b) => b.bidAmount - a.bidAmount)[0];
+
+                    console.log(
+                        highestBid
+                            ? `Auction ${auctionId} closed. Winner: ${highestBid.user.email}`
+                            : `Auction ${auctionId} closed with no bids.`
+                    );
+
+                    const participantsEmails = auctionToClose.participants
+                        .map(user => user.email);
+
+                    for (const email of participantsEmails) {
+                        await transporter.sendMail({
+                            from: "admin",
+                            to: email,
+                            subject: 'Auction Results',
+                            text: highestBid
+                                ? `The auction ${auctionToClose.itemName} has ended. Winner: ${highestBid.user.email}, Winning Bid: $${highestBid.bidAmount}`
+                                : `The auction ${auctionToClose.itemName} has ended with no winning bids.`,
+                        });
+                    }
+
+                    console.log('Emails sent to all participants.');
+
+                    auctionToClose.isActive = false;
+                    auctionToClose.highestBidder = highestBid ? highestBid.user : null;
+                    auctionToClose.currentPrice = highestBid ? highestBid.bidAmount : auctionToClose.startingPrice;
+
+                    auctionToClose.bids = [];
+                    auctionToClose.participants = [];
+                    auctionToClose.currentPrice = 0;
+                    auctionToClose.endTime = auctionToClose.startTime;
+
+                    await auctionToClose.save();
+
+                    // Notify all participants that the auction has ended
+                    broadcastToAuction(auctionId, { type: 'end', message: 'Auction ended!' });
+
+                } catch (error) {
+                    console.error(`Error closing auction ${auctionId}: ${error.message}`);
+                }
+            }, 400000);
+
+            res.send({ message: "Auction started successfully", auction });
+        } catch (error) {
+            res.status(500).send(error.message);
+        }
+    };
 
 
 

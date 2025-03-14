@@ -46,6 +46,7 @@ const login = async (req, res) => {
                 }, process.env.SECRETKEY || '123', { expiresIn: '1h' });
 
                 res.status(200).send(token);
+
             } else {
                 res.status(401).send("Invalid credentials");
             }
