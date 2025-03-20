@@ -13,6 +13,7 @@ exports.verifyToken = (req, res, next) => {
         req.user = {
             _id: decoded._id,
             email: decoded.email,
+            name: decoded.name,
             role: decoded.role, // Include the role from the token
             iat: decoded.iat
         };

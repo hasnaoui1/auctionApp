@@ -1,5 +1,7 @@
 const Auction = require ('../models/auction.model')
 const Bid = require('../models/bids.model')
+const User = require('../models/users.model')
+
 const addAuction=(req,res)=>{
     let Auction = new auctionModel(req.body)
     try{
@@ -14,7 +16,7 @@ const addAuction=(req,res)=>{
 const deleteAuction=(req,res)=>{
     let id = req.body.id;
     try{
-        auctionModel.deleteOne({_id : id})
+        Auction.deleteOne({_id : id})
         res.status(200).send("Auction deleted")
     }catch(err){
         res.status(420).send(err)
@@ -32,7 +34,7 @@ const updateAuction=async (req,res)=>{
     
 }
 const getAllAuctions = async (req, res) => {
-    data = await auctionModel.find()
+    data = await Auction.find()
     res.send(data)
     
 }
@@ -51,29 +53,32 @@ const getAuctionById = async (req, res) => {
 }
 
 
-// controllers/auction.controller.js
 
 const { broadcastToAuction } = require('./websocket.controller');
 
 joinAuction = async (req, res) => {
     const { auctionId } = req.body;
-    const userId = req.user.id;
-
+    const userId = req.user._id;
+   
     try {
         const auction = await Auction.findById(auctionId);
+        const user =  await User.findById(userId)
 
+        
         if (!auction) {
             return res.status(404).send("Auction not found");
         }
+        broadcastToAuction( auctionId, { type: 'join', user: user.name });
+        
 
-        // Add user to the auction's participants list
+        if (auction.participants.includes(userId)) {
+            return res.status(400).json({ message: "User already joined the auction" });
+        }
+
         if (!auction.participants.includes(userId)) {
             auction.participants.push(userId);
             await auction.save();
         }
-
-        // Notify the user to join the WebSocket room
-        broadcastToAuction(auctionId, { type: 'join', userId });
 
         res.status(200).send({ message: "Joined auction successfully", auction , auctionId });
     } catch (error) {
@@ -115,9 +120,9 @@ const transporter = nodemailer.createTransport({
             auction.isActive = true;
             await auction.save();
 
-            // Notify all participants that the auction has started
-            broadcastToAuction(auctionId, { type: 'start', message: 'Auction started!' });
-
+            broadcastToAuction(auctionId, 'auctionStarted', {
+                message: 'Auction started!'
+            });
             setTimeout(async () => {
                 try {
                     const auctionToClose = await Auction.findById(auctionId)
@@ -142,8 +147,15 @@ const transporter = nodemailer.createTransport({
                             ? `Auction ${auctionId} closed. Winner: ${highestBid.user.email}`
                             : `Auction ${auctionId} closed with no bids.`
                     );
+                    broadcastToAuction(auctionId, 'auctionClosed', { 
+                        message: highestBid 
+                            ? `Auction ${auctionId} closed. Winner: ${highestBid.user.email}`
+                            : `Auction ${auctionId} closed with no bids.`
+                    });
+                   
 
-                    const participantsEmails = auctionToClose.participants
+
+                    /*const participantsEmails = auctionToClose.participants
                         .map(user => user.email);
 
                     for (const email of participantsEmails) {
@@ -155,9 +167,10 @@ const transporter = nodemailer.createTransport({
                                 ? `The auction ${auctionToClose.itemName} has ended. Winner: ${highestBid.user.email}, Winning Bid: $${highestBid.bidAmount}`
                                 : `The auction ${auctionToClose.itemName} has ended with no winning bids.`,
                         });
-                    }
+                    } */
 
                     console.log('Emails sent to all participants.');
+
 
                     auctionToClose.isActive = false;
                     auctionToClose.highestBidder = highestBid ? highestBid.user : null;
@@ -167,16 +180,16 @@ const transporter = nodemailer.createTransport({
                     auctionToClose.participants = [];
                     auctionToClose.currentPrice = 0;
                     auctionToClose.endTime = auctionToClose.startTime;
+                    auctionToClose.highestBidder = null;
 
                     await auctionToClose.save();
 
-                    // Notify all participants that the auction has ended
-                    broadcastToAuction(auctionId, { type: 'end', message: 'Auction ended!' });
+
 
                 } catch (error) {
                     console.error(`Error closing auction ${auctionId}: ${error.message}`);
                 }
-            }, 400000);
+            }, 60000);
 
             res.send({ message: "Auction started successfully", auction });
         } catch (error) {
@@ -190,4 +203,5 @@ const transporter = nodemailer.createTransport({
 
 
 
-module.exports= {addAuction,deleteAuction,updateAuction,getAuctionById,getAllAuctions,joinAuction, startAuction}
+
+module.exports= {addAuction,deleteAuction,updateAuction,getAuctionById,getAllAuctions,joinAuction, startAuction }

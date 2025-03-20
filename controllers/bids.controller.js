@@ -35,8 +35,6 @@ const placeBid = async (req, res) => {
         auction.bids.push(newBid._id);
         await auction.save();
 
-        // Broadcast the new bid to all participants
-        broadcastToAuction(auctionId, { type: 'newBid', bid: newBid, user });
 
         res.send({ message: "Bid placed successfully", newBid });
     } catch (error) {

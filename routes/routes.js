@@ -26,7 +26,6 @@ module.exports = (app) => {
     app.post('/join-auction',verifyToken,auctionController.joinAuction)
     app.post('/startAuction',verifyToken,auctionController.startAuction)
 
-   
     app.post('/place-bid',verifyToken, bidController.placeBid);
     
 };

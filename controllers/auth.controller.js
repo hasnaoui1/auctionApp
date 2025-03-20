@@ -43,7 +43,7 @@ const login = async (req, res) => {
                     _id: user._id,
                     email: user.email,
                     role: user.role, 
-                }, process.env.SECRETKEY || '123', { expiresIn: '1h' });
+                }, process.env.SECRETKEY || '123', { expiresIn: '12h' });
 
                 res.status(200).send(token);
 

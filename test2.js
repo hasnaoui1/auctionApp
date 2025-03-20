@@ -1,7 +1,6 @@
 // Frontend code
 async function joinAuction(auctionId) {
-    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NzYyMGY3NjZiZWI0MmU5NmM4NGEyYjEiLCJlbWFpbCI6InRlbXA2NnRAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NDE5MDU3NzEsImV4cCI6MTc0MTkwOTM3MX0.fmkEYBAPrMq7JEa0JDS3SpPWEabIEd_gePjsxLJsRkU.eyJfaWQiOiI2NzYyMGY3NjZiZWI0MmU5NmM4NGEyYjEiLCJlbWFpbCI6InRlbXA2NnRAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NDE5MDI4ODQsImV4cCI6MTc0MTkwNjQ4NH0.ITAzUD6yRS-1snaa7cWAAvjEHfQSk7dyaA2wyym3Yh4";
-
+    const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NzYyMGY3NjZiZWI0MmU5NmM4NGEyYjEiLCJlbWFpbCI6InRlbXA2NnRAZ21haWwuY29tIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NDIxNzUwMTMsImV4cCI6MTc0MjE3ODYxM30.IXAx4xq5fTW8cncR_Kc0ByVwc0tRh-GfsWNLbI3cMB0"
     try {
         const response = await fetch('http://localhost:3008/join-auction', {
             method: 'POST',
