@@ -68,7 +68,7 @@ joinAuction = async (req, res) => {
         if (!auction) {
             return res.status(404).send("Auction not found");
         }
-        broadcastToAuction( auctionId, { type: 'join', user: user.name });
+        broadcastToAuction( auctionId,  'join',{ user: user.name });
         
 
         if (auction.participants.includes(userId)) {

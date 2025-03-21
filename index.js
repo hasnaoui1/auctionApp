@@ -22,40 +22,46 @@ global.io=io;
 
 app.use(express.json());
 
-// Connect to MongoDB
+
 mongoose.connect(process.env.DB)
     .then(() => console.log("MongoDB connected"))
     .catch(err => console.log(err));
 
-// Import and use routes
+
 require("./routes/routes")(app);
 
-// Socket.IO connection handler
+
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
 
-    // Handle joining an auction room
+    
     socket.on('joinAuction', (auctionId) => {
         socket.join(`auction_${auctionId}`);
         console.log(`Client ${socket.id} joined auction ${auctionId}`);
+
+        io.to(`auction_${auctionId}`).emit('userJoined', { userId: socket.id, auctionId });
     });
 
-    // Handle placing a bid
-    socket.on('placeBid', (data) => {
-        const { auctionId, bid } = data;
-        console.log(`New bid on auction ${auctionId}: ${bid}`);
+    socket.on('bid', (data) => {
+        const { auctionId, bid, userName } = data;
+        console.log(`New bid on auction ${auctionId}: ${bid} by ${userName}`);
 
-        // Broadcast the bid to all participants in the auction room
-        io.to(`auction_${auctionId}`).emit('newBid', bid);
+       
+        io.to(`auction_${auctionId}`).emit('newBid', { amount: bid, userName });
     });
 
-    // Handle disconnection
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
+
+     
+        const rooms = Object.keys(socket.rooms);
+        rooms.forEach((room) => {
+            if (room.startsWith('auction_')) {
+                io.to(room).emit('userLeft', userName);
+            }
+        });
     });
 });
-
-// Start the server
 const PORT = process.env.PORT || 3008;
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

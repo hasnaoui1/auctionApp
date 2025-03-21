@@ -1,44 +1,56 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import axiosInstance from "./services/axiosInstance";
 import { jwtDecode } from "jwt-decode";
-import "bootstrap/dist/css/bootstrap.min.css"; // Import Bootstrap CSS
+import "bootstrap/dist/css/bootstrap.min.css";
 
 export default function JoinAuction() {
     const [auctionId, setAuctionId] = useState("");
     const [bid, setBid] = useState("");
     const [bids, setBids] = useState([]);
-    const [socket, setSocket] = useState(null);
     const [winnerMessage, setWinnerMessage] = useState("");
     const [auctionStatus, setAuctionStatus] = useState("");
+
+    const socketRef = useRef(null); // Use useRef to store the socket instance
 
     const token = localStorage.getItem("token");
     const decoded = token ? jwtDecode(token) : null;
     const userName = decoded?.email || "Anonymous";
 
     useEffect(() => {
-        const newSocket = io("http://localhost:3008");
-        setSocket(newSocket);
-
-        newSocket.on("new_Bid", (bidData) => {
-            console.log("New bid received:", bidData);
-            setBids((prevBids) => [...prevBids, bidData]);
-        });
-
-        newSocket.on("auctionClosed", (data) => {
-            console.log("Auction closed:", data);
-            setWinnerMessage(data.message);
-            setAuctionStatus("Auction closed");
-        });
-
-        newSocket.on("auctionStarted", (data) => {
-            console.log("Auction started:", data);
-            setAuctionStatus("Auction is active");
-            setWinnerMessage("");
-            setBids([]);
-        });
-
-        return () => newSocket.disconnect();
+        if (!socketRef.current) {
+            socketRef.current = io("http://localhost:3008");
+    
+            socketRef.current.on("userJoined", (data) => {
+                console.log("User joined:", data);
+                // Handle user joined event
+            });
+    
+            socketRef.current.on("auctionStarted", (data) => {
+                console.log("Auction started:", data);
+                setAuctionStatus("Auction is active");
+                setWinnerMessage("");
+                setBids([]);
+            });
+    
+            socketRef.current.on("auctionClosed", (data) => {
+                console.log("Auction closed:", data);
+                setWinnerMessage(data.message);
+                setAuctionStatus("Auction closed");
+            });
+    
+            socketRef.current.on("newBid", (bidData) => {
+                console.log("New bid received:", bidData);
+                setBids((prevBids) => [...prevBids, bidData]);
+            });
+        }
+    
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+        };
     }, []);
 
     const joinAuction = async () => {
@@ -56,8 +68,8 @@ export default function JoinAuction() {
                 }
             );
 
-            if (socket) {
-                socket.emit("joinAuction", auctionId);
+            if (socketRef.current) {
+                socketRef.current.emit("joinAuction", auctionId);
             }
         } catch (error) {
             console.error("Error joining auction:", error);
@@ -65,8 +77,8 @@ export default function JoinAuction() {
     };
 
     const sendBid = async () => {
-        if (!socket || !bid.trim()) return;
-
+        if (!socketRef.current || !bid.trim()) return;
+    
         try {
             const response = await axiosInstance.post(
                 "/place-bid",
@@ -75,8 +87,9 @@ export default function JoinAuction() {
                     headers: { Authorization: `Bearer ${token}` },
                 }
             );
-
-            socket.emit("bid", { auctionId, amount: response.newBid.bidAmount, userName });
+    
+            // Emit the bid event with userName and bid amount
+            socketRef.current.emit("bid", { auctionId, bid: response.newBid.bidAmount, userName });
             setBid("");
         } catch (error) {
             console.error("Error placing bid:", error);
