@@ -12,9 +12,9 @@ const navigate = useNavigate();
   const handleSubmit = (e) => {
     e.preventDefault();
     axiosInstance.post('/login', { email, password })
-      .then((res) =>{console.log(res);
+      .then((res) =>{
          localStorage.setItem('token', res);
-                navigate('/auction');})
+                navigate('/auctions');})
       .catch((err) => setError(err.response.data.message));
   };
 

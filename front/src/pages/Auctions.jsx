@@ -1,27 +1,30 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../services/axiosInstance";
 import "bootstrap/dist/css/bootstrap.min.css";
+import { useNavigate } from "react-router-dom";
 
 export default function Auctions() {
   const [auctions, setAuctions] = useState([]);
   const [error, setError] = useState(null);
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('token'); 
+  const navigate = useNavigate();
+  
+  async function fetchAuctions() {
+    try {
+      const res = await axiosInstance.get("/auctions", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setAuctions(res || []);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to fetch auctions. Please try again later.");
+      setAuctions([]);
+    }
+  }
 
   useEffect(() => {
-    async function fetchAuctions() {
-      try {
-        const res = await axiosInstance.get("/auctions", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        setAuctions(res.data || []); // Ensure auctions is always an array
-      } catch (err) {
-        console.error(err);
-        setError("Failed to fetch auctions. Please try again later.");
-        setAuctions([]); // Set auctions to an empty array in case of error
-      }
-    }
     fetchAuctions();
   }, []);
 
@@ -35,7 +38,11 @@ export default function Auctions() {
       <div className="row">
         {auctions.length > 0 ? (
           auctions.map((auction) => (
-            <div key={auction._id} className="col-md-4 mb-4">
+            <div
+              key={auction._id}
+              className="col-md-4 mb-4"
+              onClick={() => navigate(`/auction/${auction._id}`)}  // Fix: pass a function here
+            >
               <div className="card shadow-sm">
                 <div className="card-body">
                   <h5 className="card-title">{auction.itemName}</h5>

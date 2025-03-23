@@ -1,31 +1,35 @@
-import { useState } from "react";
+import { useState, useEffect } from "react"; 
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./pages/Layout";
-import JoinAuction from "./JoinAuction";
+import JoinAuction from "./pages/JoinAuction";
 import Signin from "./auth/signin";
 import Home from "./pages/Home";
 import Logout from "./components/Logout";
 import Auctions from "./pages/Auctions";
+import Profile from "./pages/Profile";
 
-
+const ProtectedRoute = ({ children }) => {
+    const token = localStorage.getItem("token");
+    return token ? children : <Navigate to="/auth/signin" />;
+};
 
 export default function AppRoutes() {
-    const [token, setToken] = useState(localStorage.getItem('token'));
+    const [token, setToken] = useState(localStorage.getItem("token"));
+
+    
 
     return (
         <BrowserRouter>
             <Routes>
-                <Route path="/" element={token ? <Home /> : <Navigate to="/auth/signin" />} />
-                <Route path="auction" element={<JoinAuction />} />
-                <Route path="auth/signin" element={<Signin/>} />
-                <Route path="" element={<Home />} />
-                <Route path="/logout" element={<Logout/>} />
-                <Route path="/auctions" element={<Auctions/>} />
-
-
-               
+                <Route path="/auth/signin" element={<Signin />} />
+                
+              
+                <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                <Route path="/auction/:id" element={<ProtectedRoute><JoinAuction /></ProtectedRoute>} />
+                <Route path="/logout" element={<ProtectedRoute><Logout /></ProtectedRoute>} />
+                <Route path="/auctions" element={<ProtectedRoute><Auctions /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             </Routes>
-        
         </BrowserRouter>
     );
 }

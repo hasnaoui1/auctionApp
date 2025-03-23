@@ -42,15 +42,22 @@ const getAllAuctions = async (req, res) => {
 
 
 const getAuctionById = async (req, res) => {
-    let id = req.params.id
-    try{
-        data = await auctionModel.findOne({_id: id})
-        res.send(data)
-    }catch(err){
-        res.status(420).send(err)   
+    const id = req.params.id;
 
+    try {
+        const auction = await Auction.findOne({ _id: id });
+
+        if (!auction) {
+            return res.status(404).json({ message: "Auction not found" });
+        }
+
+        res.status(200).json(auction);
+    } catch (err) {
+        console.error("Error fetching auction:", err);
+        res.status(500).json({ message: "Internal Server Error", error: err.message });
     }
-}
+};
+
 
 
 
