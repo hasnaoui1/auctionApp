@@ -1,54 +1,50 @@
-import React, { useState } from 'react';
-import {useNavigate} from 'react-router-dom'
-import axiosInstance from '../services/axiosInstance';
+import React, { useEffect, useRef } from "react";
+import keycloak from "../services/keycloak";
+import { useNavigate } from "react-router-dom";
 
 export default function Signin() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const navigate = useNavigate();
+  const hasRedirected = useRef(false);
 
-const navigate = useNavigate();
+  useEffect(() => {
+    // If already authenticated, save token and redirect to auctions (only once)
+    if (keycloak.authenticated && !hasRedirected.current) {
+      hasRedirected.current = true;
+      // Save the token to localStorage so ProtectedRoute can access it
+      if (keycloak.token) {
+        localStorage.setItem("token", keycloak.token);
+      }
+      navigate("/auctions");
+    }
+  }, []);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    axiosInstance.post('/login', { email, password })
-      .then((res) =>{
-         localStorage.setItem('token', res);
-                navigate('/auctions');})
-      .catch((err) => setError(err.response.data.message));
+  const login = () => {
+    keycloak.login({
+      redirectUri: window.location.origin + "/auctions"
+    }).then(() => {
+      // Save token after successful login
+      if (keycloak.token) {
+        localStorage.setItem("token", keycloak.token);
+      }
+    });
   };
 
   return (
-    <div className="d-flex justify-content-center align-items-center vh-100">
-      <div className="card shadow-lg" style={{ width: '100%', maxWidth: '400px' }}>
-        <div className="card-body">
-          <h3 className="card-title text-center mb-4">Sign In</h3>
-          {error && <div className="alert alert-danger">{error}</div>}
-          <form onSubmit={handleSubmit}>
-            <div className="mb-3">
-              <label htmlFor="email" className="form-label">Email address</label>
-              <input 
-                type="email" 
-                id="email" 
-                className="form-control" 
-                onChange={(e) => setEmail(e.target.value)} 
-                value={email} 
-                required 
-              />
-            </div>
-            <div className="mb-3">
-              <label htmlFor="password" className="form-label">Password</label>
-              <input 
-                type="password" 
-                id="password" 
-                className="form-control" 
-                onChange={(e) => setPassword(e.target.value)} 
-                value={password} 
-                required 
-              />
-            </div>
-            <button type="submit" className="btn btn-primary w-100">Login</button>
-          </form>
+    <div className="d-flex justify-content-center align-items-center vh-100 bg-light">
+      <div className="card shadow-lg" style={{ width: "100%", maxWidth: "400px" }}>
+        <div className="card-body text-center p-5">
+          <h2 className="mb-4">Auction Platform</h2>
+          <p className="text-muted mb-4">Sign in to participate in auctions</p>
+          <button 
+            onClick={login} 
+            className="btn btn-primary btn-lg w-100 mb-3"
+          >
+            <i className="bi bi-box-arrow-in-right me-2"></i>
+            Login with Keycloak
+          </button>
+          <p className="text-muted mb-0">
+            Don't have an account? <a href="/auth/signup">Sign up</a>
+          </p>
         </div>
       </div>
     </div>
