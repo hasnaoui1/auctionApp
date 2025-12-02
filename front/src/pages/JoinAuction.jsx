@@ -12,7 +12,10 @@ export default function JoinAuction() {
     const [bid, setBid] = useState("");
     const [bids, setBids] = useState([]);
     const [winnerMessage, setWinnerMessage] = useState("");
-    const [auctionStatus, setAuctionStatus] = useState('Inactive');
+    const [auctionStatus, setAuctionStatus] = useState('Loading...');
+    const [hasJoined, setHasJoined] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [participants, setParticipants] = useState([]);
     
     let params = useParams();
     const auctionId = params.id;
@@ -28,17 +31,77 @@ export default function JoinAuction() {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setAuction(response.data);
+            // Set status based on the active boolean from backend
+            const status = response.data.active ? 'Active' : 'Inactive';
+            setAuctionStatus(status);
+            // Get participants list
+            setParticipants(response.data.participants || []);
+            console.log("Auction fetched - Status:", status, "Active:", response.data.active, "Participants:", response.data.participants);
         } catch (error) {
             console.error("Error fetching auction:", error);
+            setAuctionStatus('Error loading auction');
         }
     };
 
+    const fetchBids = async () => {
+        try {
+            const response = await axiosInstance.get(`/bids`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            console.log("All bids from backend:", response.data);
+            
+            // Filter bids for this auction
+            const auctionBids = response.data.filter(b => {
+                const bidAuctionId = b.auction?.id || b.auctionId;
+                return bidAuctionId === parseInt(auctionId);
+            });
+            
+            console.log("Filtered bids for auction", auctionId, ":", auctionBids);
+            
+            // Map bids to display format
+            const formattedBids = auctionBids.map((b, index) => ({
+                key: index,
+                userName: b.bidderId || b.userId || 'Unknown User',
+                amount: b.amount || 0
+            }));
+            
+            setBids(formattedBids);
+            console.log("Formatted bids:", formattedBids);
+        } catch (error) {
+            console.error("Error fetching bids:", error);
+        }
+    };
+
+    const joinAuction = async () => {
+        setLoading(true);
+        try {
+            const response = await axiosInstance.post(`/auction/join/${auctionId}`, {}, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            console.log("Successfully joined auction:", response.data);
+            setHasJoined(true);
+            alert("You've successfully joined the auction!");
+            fetchAuction(); // Refresh participants list
+        } catch (error) {
+            console.error("Error joining auction:", error);
+            alert(error.response?.data?.message || "Failed to join auction");
+        } finally {
+            setLoading(false);
+        }
+    };
+    useEffect(() => {},[auction?.status , participants])
+
+
     useEffect(() => {
         fetchAuction();
-        
-        // Initialize STOMP client for WebSocket
-        if (!stompClientRef.current) {
-            const socket = new SockJS("http://localhost:8080/ws");
+        fetchBids();
+            
+         if (!stompClientRef.current) {
+            const socket = new SockJS("http://localhost:8080/ws", {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
             const client = new Client({
                 webSocketFactory: () => socket,
                 reconnectDelay: 5000,
@@ -50,29 +113,31 @@ export default function JoinAuction() {
                 onConnect: () => {
                     console.log("Connected to WebSocket");
 
-                    // Subscribe to auction start events
                     client.subscribe(`/topic/auction/${auctionId}/start`, (message) => {
-                        console.log("Auction started:", message.body);
-                        setAuctionStatus("Auction is active");
+                        console.log("Auction started via WebSocket:", message.body);
+                        setAuctionStatus('Active');
                         setWinnerMessage("");
+                        fetchAuction(); 
                     });
 
-                    // Subscribe to auction end events
+                    
                     client.subscribe(`/topic/auction/${auctionId}/end`, (message) => {
-                        console.log("Auction ended:", message.body);
-                        const data = JSON.parse(message.body);
-                        setWinnerMessage(data.message || `Winner: ${data.winnerId || 'No winner'}`);
-                        setAuctionStatus("Auction closed");
+                        console.log("Auction ended via WebSocket:", message.body);
+                        setWinnerMessage(`Winner: ${message.body || 'No winner'}`);
+                        setAuctionStatus('Inactive');
+                        fetchAuction(); 
                     });
 
-                    // Subscribe to new bids
+                 
                     client.subscribe(`/topic/auction/${auctionId}/bids`, (message) => {
-                        console.log("New bid received:", message.body);
-                        const bidData = JSON.parse(message.body);
-                        setBids((prevBids) => [...prevBids, {
-                            userName: bidData.userName || bidData.userId,
-                            amount: bidData.bidAmount || bidData.amount
-                        }]);
+                        console.log("New bid received via WebSocket:", message.body);
+                        fetchBids(); 
+                    });
+
+                    // Subscribe to participant join events
+                    client.subscribe(`/topic/auction/${auctionId}/participants`, (message) => {
+                        console.log("New participant joined:", message.body);
+                        fetchAuction(); // Refresh auction to get updated participants list
                     });
                 },
                 onStompError: (frame) => {
@@ -86,12 +151,13 @@ export default function JoinAuction() {
         }
     
         return () => {
+           
             if (stompClientRef.current) {
                 stompClientRef.current.deactivate();
                 stompClientRef.current = null;
             }
         };
-    }, [auctionId]);
+    }, [auctionId, token]);
 
     const sendBid = async () => {
         if (!bid.trim()) {
@@ -101,11 +167,10 @@ export default function JoinAuction() {
     
         try {
             const response = await axiosInstance.post(
-                `/bids?auctionId=${auctionId}`,
+                `/bids/${auctionId}`,
                 {
-                    bidAmount: parseFloat(bid),
-                    auctionId: parseInt(auctionId),
-                    userId: userName
+                    amount: parseFloat(bid),
+                   
                 },
                 {
                     headers: { Authorization: `Bearer ${token}` },
@@ -114,6 +179,7 @@ export default function JoinAuction() {
     
             console.log("Bid placed successfully:", response.data);
             setBid("");
+            await fetchBids(); // Refresh bids list
         } catch (error) {
             console.error("Error placing bid:", error);
             alert(error.response?.data?.message || "Failed to place bid");
@@ -139,7 +205,27 @@ export default function JoinAuction() {
 
                         {/* Auction Status */}
                         <div className="alert alert-info">
-                            <strong>Auction Status:</strong> {auctionStatus}
+                            <strong>Auction Status:</strong> {auctionStatus || (auction ? (auction.active ? 'Active' : 'Inactive') : 'Loading...')}
+                        </div>
+
+                        {/* Participants Section */}
+                        <div className="mb-4">
+                            <h3 className="mb-3">Participants ({participants.length})</h3>
+                            <div className="list-group">
+                                {participants.length > 0 ? (
+                                    participants.map((participant, index) => (
+                                        <div key={index} className="list-group-item d-flex justify-content-between align-items-center">
+                                            <span>
+                                                <i className="bi bi-person-circle me-2"></i>
+                                                <strong>{participant}</strong>
+                                            </span>
+                                            {participant === userName && <span className="badge bg-success">You</span>}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="list-group-item text-muted">No participants yet</div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Bids Section */}
@@ -159,7 +245,7 @@ export default function JoinAuction() {
                         </div>
 
                         {/* Place Bid Section */}
-                        {auctionStatus === "Auction is active" && (
+                        {auctionStatus === 'Active' ? (
                             <div className="mb-4">
                                 <h3 className="mb-3">Place a Bid</h3>
                                 <div className="input-group">
@@ -176,6 +262,10 @@ export default function JoinAuction() {
                                     <button className="btn btn-primary" onClick={sendBid}>Place Bid</button>
                                 </div>
                             </div>
+                        ) : (
+                            <div className="alert alert-warning mt-4">
+                                <strong>Auction is not active.</strong> You cannot place bids at this time.
+                            </div>
                         )}
 
                         {/* Winner Message */}
@@ -185,6 +275,24 @@ export default function JoinAuction() {
                                 <p>{winnerMessage}</p>
                             </div>
                         )}
+
+                        {!hasJoined && (
+                            <button 
+                                className="btn btn-success mt-3" 
+                                onClick={joinAuction}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        Joining...
+                                    </>
+                                ) : (
+                                    'Join Auction'
+                                )}
+                            </button>
+                        )}
+                        {hasJoined && <p className="text-success mt-3"><strong>✓ You have joined this auction</strong></p>}
                     </div>
                 </div>
             </div>

@@ -11,9 +11,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")               // WebSocket endpoint
-                .setAllowedOrigins("*")          // allow frontend
+                .setAllowedOrigins("http://localhost:5173")          // allow frontend
                 .withSockJS();                   // fallback for old browsers
     }
+
+
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {

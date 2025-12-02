@@ -29,10 +29,9 @@ public class Auction {
 
 
     @ElementCollection
-    @JsonIgnore
-    private List<String> participantIds;
+    private List<String> participants;
 
-    @JsonIgnore
+
     @OneToMany(mappedBy = "auction")
     private List<Bid> bids;
 }

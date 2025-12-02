@@ -1,5 +1,6 @@
 package org.example.auctionbackend.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -20,6 +21,7 @@ public class Bid {
 
     @ManyToOne
     @JoinColumn(name = "auction_id")
+    @JsonIgnore
     private Auction auction;
 
 

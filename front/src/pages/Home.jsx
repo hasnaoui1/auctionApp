@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 
 
@@ -10,7 +11,9 @@ export default function Home() {
           <div className="col-md-6 text-center text-md-start">
             <h1 className="display-4 fw-bold">Discover Exclusive Auctions</h1>
             <p className="lead text-muted">Bid on unique items and get the best deals in real-time auctions.</p>
-            <a href="/auctions" className="btn btn-primary btn-lg">Explore Auctions</a>
+            <Link to="/auctions">
+            <button className="btn btn-primary btn-lg">Explore Auctions</button>
+            </Link>
           </div>
           <div className="col-md-6 text-center">
             <img src="auction.png" alt="Auction" className="img-fluid rounded shadow-lg" />

@@ -21,4 +21,7 @@ public class AuctionWS {
     public void broadcastEnd(Integer auctionId, Object winner) {
         messaging.convertAndSend("/topic/auction/" + auctionId + "/end", winner);
     }
+    public void broadcastParticipants(Integer auctionId) {
+        messaging.convertAndSend("/topic/auction/" + auctionId + "/participants", "New participant joined");
+    }
 }

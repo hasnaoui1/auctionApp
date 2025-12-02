@@ -3,6 +3,7 @@ import axiosInstance from "../services/axiosInstance";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useNavigate } from "react-router-dom";
 import keycloak from "../services/keycloak";
+import Navbar from "../components/Navbar";
 
 export default function Auctions() {
   const [auctions, setAuctions] = useState([]);
@@ -19,7 +20,9 @@ export default function Auctions() {
           Authorization: `Bearer ${token}`,
         },
       });
-      setAuctions(res.data || []);
+      console.log(res?.data)
+      
+      setAuctions(res?.data || [] );
     } catch (err) {
       console.error(err);
       setError("Failed to fetch auctions. Please try again later.");
@@ -36,10 +39,12 @@ export default function Auctions() {
   }
 
   return (
+    <>
+    <Navbar/>
     <div className="container mt-4">
       <h2 className="mb-4 text-center">Auction Listings</h2>
       <div className="row">
-        {auctions.length > 0 ? (
+        {auctions?.length > 0 ? (
           auctions.map((auction) => (
             <div
               key={auction.id}
@@ -66,5 +71,7 @@ export default function Auctions() {
         )}
       </div>
     </div>
+    </>
   );
+
 }

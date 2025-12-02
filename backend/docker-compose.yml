@@ -8,9 +8,11 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: password
     volumes:
-      - keycloak_data:/opt/keycloak/data
+      - keycloak_data:/opt/keycloak/data/
     command:
       - 'start-dev'
 
 volumes:
   keycloak_data:
+    external: true
+    name: auctionbackend_keycloak_data

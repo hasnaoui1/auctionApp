@@ -18,33 +18,32 @@ public class bidServiceImpl implements bidService {
     private final bidRepository bidRepository;
     private final auctionRepository auctionRepository;
     private final AuctionWS  auctionWS;
+
     @Override
-    public Bid placeBid(Bid bid, int auctionId) {
-        try {
-            Auction a = auctionRepository.findById(auctionId)
-                    .orElseThrow(() -> new RuntimeException("Auction not found"));
+    public Bid placeBid( Bid bid,int auctionId) {
+        Auction auction = auctionRepository.findById(auctionId)
+                .orElseThrow(() -> new RuntimeException("Auction not found"));
 
-            // Get current Keycloak user ID
-            String userId = SecurityContextHolder.getContext()
-                    .getAuthentication()
-                    .getName();
+        int currentPrice = auction.getCurrentPrice();
 
-            // Check if auction active + user allowed + at least 2 participants
-            if (a.isActive()
-                    && a.getParticipantIds().size() > 2
-                    && a.getParticipantIds().contains(userId)) {
-
-                bid.setAuction(a);
-                auctionWS.broadcastBid(auctionId, bid);// required for mappedBy
-                return bidRepository.save(bid);
-            }
-
-            throw new RuntimeException("User not allowed to bid");
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+        if (bid.getAmount() <= currentPrice) {
+            throw new RuntimeException("Bid too low. Must be higher than current price: " + currentPrice);
         }
+
+
+        bid.setAuction(auction);
+        String user = SecurityContextHolder.getContext().getAuthentication().getName();
+        bid.setBidderId(user);
+
+        // Save bid
+        bidRepository.save(bid);
+
+        // Update auction current price
+        auction.setCurrentPrice(bid.getAmount());
+        auctionRepository.save(auction);
+        auctionWS.broadcastBid(auctionId,bid);
+
+        return bid;
     }
 
 

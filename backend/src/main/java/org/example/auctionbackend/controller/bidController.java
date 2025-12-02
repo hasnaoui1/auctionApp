@@ -2,9 +2,7 @@ package org.example.auctionbackend.controller;
 
 import lombok.AllArgsConstructor;
 import org.example.auctionbackend.entities.Bid;
-import org.example.auctionbackend.service.auctionService;
 import org.example.auctionbackend.service.bidService;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -15,19 +13,23 @@ import java.util.List;
 @RequestMapping("/bids")
 @AllArgsConstructor
 public class bidController {
+
     private final bidService bidService;
 
-    @PostMapping
+    @PostMapping("/{auctionId}")
     @PreAuthorize("hasRole('role_user')")
-    public ResponseEntity<Bid> addBid(@RequestBody Bid bid , @RequestParam Integer auctionId) {
-
-return null;
+    public ResponseEntity<String> addBid(@RequestBody Bid bid, @PathVariable int auctionId) {
+        try {
+            Bid placedBid = bidService.placeBid(bid,auctionId);
+            return ResponseEntity.ok("Bid placed successfully. New current price: " + placedBid.getAmount());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @GetMapping
     @PreAuthorize("hasRole('role_user')")
     public ResponseEntity<List<Bid>> getAllBids() {
-        return new ResponseEntity<>(bidService.getAllBids(), HttpStatus.OK);
-
+        return ResponseEntity.ok(bidService.getAllBids());
     }
 }

@@ -16,9 +16,9 @@ keycloak
     }
 
     ReactDOM.createRoot(document.getElementById("root")).render(
-      <React.StrictMode>
+      <>
         <App />
-      </React.StrictMode>
+      </>
     );
   })
   .catch((err) => console.error("Keycloak init failed", err));

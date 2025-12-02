@@ -6,7 +6,7 @@ const keycloak = new Keycloak({
     clientId: "demo",
 });
 
-// Set up token interceptor to handle token refresh
+
 keycloak.onTokenExpired = () => {
     keycloak.updateToken(5).catch(() => {
         console.log("Failed to refresh token");
