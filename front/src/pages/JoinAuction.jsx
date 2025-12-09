@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
@@ -6,6 +7,8 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import { useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import keycloak from "../services/keycloak";
+
+import "./JoinAuction.css";
 
 export default function JoinAuction() {
     const [auction, setAuction] = useState(null);
@@ -36,39 +39,21 @@ export default function JoinAuction() {
             setAuctionStatus(status);
             // Get participants list
             setParticipants(response.data.participants || []);
+            
+            // Get bids from auction data
+            if (response.data.bids) {
+                const formattedBids = response.data.bids.map((b, index) => ({
+                    key: index,
+                    userName: b.bidderId || b.userId || 'Unknown User',
+                    amount: b.amount || 0
+                }));
+                setBids(formattedBids);
+            }
+
             console.log("Auction fetched - Status:", status, "Active:", response.data.active, "Participants:", response.data.participants);
         } catch (error) {
             console.error("Error fetching auction:", error);
             setAuctionStatus('Error loading auction');
-        }
-    };
-
-    const fetchBids = async () => {
-        try {
-            const response = await axiosInstance.get(`/bids`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            console.log("All bids from backend:", response.data);
-            
-            // Filter bids for this auction
-            const auctionBids = response.data.filter(b => {
-                const bidAuctionId = b.auction?.id || b.auctionId;
-                return bidAuctionId === parseInt(auctionId);
-            });
-            
-            console.log("Filtered bids for auction", auctionId, ":", auctionBids);
-            
-            // Map bids to display format
-            const formattedBids = auctionBids.map((b, index) => ({
-                key: index,
-                userName: b.bidderId || b.userId || 'Unknown User',
-                amount: b.amount || 0
-            }));
-            
-            setBids(formattedBids);
-            console.log("Formatted bids:", formattedBids);
-        } catch (error) {
-            console.error("Error fetching bids:", error);
         }
     };
 
@@ -80,7 +65,7 @@ export default function JoinAuction() {
             });
             console.log("Successfully joined auction:", response.data);
             setHasJoined(true);
-            alert("You've successfully joined the auction!");
+            // alert("You've successfully joined the auction!"); // Removed alert for smoother UX
             fetchAuction(); // Refresh participants list
         } catch (error) {
             console.error("Error joining auction:", error);
@@ -89,12 +74,12 @@ export default function JoinAuction() {
             setLoading(false);
         }
     };
+
     useEffect(() => {},[auction?.status , participants])
 
 
     useEffect(() => {
         fetchAuction();
-        fetchBids();
             
          if (!stompClientRef.current) {
             const socket = new SockJS("http://localhost:8080/ws", {
@@ -131,7 +116,23 @@ export default function JoinAuction() {
                  
                     client.subscribe(`/topic/auction/${auctionId}/bids`, (message) => {
                         console.log("New bid received via WebSocket:", message.body);
-                        fetchBids(); 
+                        try {
+                            const newBid = JSON.parse(message.body);
+                            setBids(prev => {
+                                // Check if bid already exists to avoid duplicates
+                                const exists = prev.some(b => b.amount === newBid.amount && b.userName === (newBid.bidderId || newBid.userId));
+                                if (exists) return prev;
+                                
+                                return [...prev, {
+                                    key: prev.length,
+                                    userName: newBid.bidderId || newBid.userId || 'Unknown User',
+                                    amount: newBid.amount
+                                }];
+                            });
+                        } catch (e) {
+                            console.error("Error parsing bid message:", e);
+                        }
+                        fetchAuction(); 
                     });
 
                     // Subscribe to participant join events
@@ -179,120 +180,130 @@ export default function JoinAuction() {
     
             console.log("Bid placed successfully:", response.data);
             setBid("");
-            await fetchBids(); // Refresh bids list
+            await fetchAuction(); // Refresh auction and bids
         } catch (error) {
             console.error("Error placing bid:", error);
             alert(error.response?.data?.message || "Failed to place bid");
         }
     };
 
+    if (!auction) {
+        return (
+            <>
+                <Navbar />
+                <div className="loading-spinner"></div>
+            </>
+        );
+    }
+
     return (
         <>
             <Navbar />
-            <div className="container mt-5">
-                <div className="card shadow">
-                    <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <h2 className="card-title">{auction ? auction.itemName : "Loading auction..."}</h2>
+            <div className="auction-container">
+                <div className="auction-card">
+                    <div className="auction-header">
+                        <h1 className="auction-title">{auction.itemName}</h1>
+                        <div style={{marginTop: '10px'}}>
+                            <span className={`status-badge ${auctionStatus === 'Active' ? 'status-active' : 'status-inactive'}`}>
+                                {auctionStatus}
+                            </span>
+                        </div>
                     </div>
-                    <div className="card-body">
-                        {/* Auction Details */}
-                        {auction && (
-                            <div className="mb-4">
-                                <p><strong>Description:</strong> {auction.description}</p>
-                                <p><strong>Starting Price:</strong> ${auction.startingPrice}</p>
+                    
+                    <div className="auction-body">
+                        {/* Left Column: Details & Participants */}
+                        <div className="info-section">
+                            <h3 style={{marginBottom: '20px', borderBottom: '2px solid rgba(255,255,255,0.1)', paddingBottom: '10px'}}>Auction Details</h3>
+                            
+                            <div className="info-item">
+                                <span className="info-label">Description</span>
+                                <span className="info-value">{auction.description}</span>
                             </div>
-                        )}
-
-                        {/* Auction Status */}
-                        <div className="alert alert-info">
-                            <strong>Auction Status:</strong> {auctionStatus || (auction ? (auction.active ? 'Active' : 'Inactive') : 'Loading...')}
-                        </div>
-
-                        {/* Participants Section */}
-                        <div className="mb-4">
-                            <h3 className="mb-3">Participants ({participants.length})</h3>
-                            <div className="list-group">
-                                {participants.length > 0 ? (
-                                    participants.map((participant, index) => (
-                                        <div key={index} className="list-group-item d-flex justify-content-between align-items-center">
-                                            <span>
-                                                <i className="bi bi-person-circle me-2"></i>
-                                                <strong>{participant}</strong>
-                                            </span>
-                                            {participant === userName && <span className="badge bg-success">You</span>}
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="list-group-item text-muted">No participants yet</div>
-                                )}
+                            <div className="info-item">
+                                <span className="info-label">Starting Price</span>
+                                <span className="info-value">${auction.startingPrice}</span>
                             </div>
-                        </div>
-
-                        {/* Bids Section */}
-                        <div className="mb-4">
-                            <h3 className="mb-3">Bids</h3>
-                            <div className="list-group">
-                                {bids.length > 0 ? (
-                                    bids.map((bidData, index) => (
-                                        <div key={index} className="list-group-item">
-                                            <strong>{bidData.userName}</strong> placed a bid of <strong>${bidData.amount}</strong>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="list-group-item text-muted">No bids yet</div>
-                                )}
+                            <div className="info-item">
+                                <span className="info-label">Current Price</span>
+                                <span className="info-value" style={{color: '#4cd137', fontSize: '1.2rem'}}>${auction.currentPrice || auction.startingPrice}</span>
                             </div>
-                        </div>
 
-                        {/* Place Bid Section */}
-                        {auctionStatus === 'Active' ? (
-                            <div className="mb-4">
-                                <h3 className="mb-3">Place a Bid</h3>
-                                <div className="input-group">
-                                    <span className="input-group-text">$</span>
-                                    <input
-                                        type="number"
-                                        className="form-control"
-                                        placeholder="Enter your bid amount"
-                                        value={bid}
-                                        onChange={(e) => setBid(e.target.value)}
-                                        min="0"
-                                        step="0.01"
-                                    />
-                                    <button className="btn btn-primary" onClick={sendBid}>Place Bid</button>
+                            <div style={{marginTop: '30px'}}>
+                                <h4 style={{color: '#a0a0a0', marginBottom: '15px'}}>Participants ({participants.length})</h4>
+                                <div className="participants-list">
+                                    {participants.length > 0 ? (
+                                        participants.map((participant, index) => (
+                                            <div key={index} className={`participant-chip ${participant === userName ? 'is-me' : ''}`}>
+                                                <i className="bi bi-person-fill"></i>
+                                                {participant}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <span style={{color: '#666'}}>No participants yet</span>
+                                    )}
                                 </div>
                             </div>
-                        ) : (
-                            <div className="alert alert-warning mt-4">
-                                <strong>Auction is not active.</strong> You cannot place bids at this time.
-                            </div>
-                        )}
 
-                        {/* Winner Message */}
-                        {winnerMessage && (
-                            <div className="alert alert-success mt-4">
-                                <h2>Auction Result</h2>
-                                <p>{winnerMessage}</p>
-                            </div>
-                        )}
+                            {!hasJoined && (
+                                <button 
+                                    className="join-btn-large" 
+                                    onClick={joinAuction}
+                                    disabled={loading}
+                                >
+                                    {loading ? 'Joining...' : 'Join Auction Now'}
+                                </button>
+                            )}
+                        </div>
 
-                        {!hasJoined && (
-                            <button 
-                                className="btn btn-success mt-3" 
-                                onClick={joinAuction}
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <>
-                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                        Joining...
-                                    </>
+                        {/* Right Column: Bids & Actions */}
+                        <div className="action-section">
+                            <h3 style={{marginBottom: '20px', borderBottom: '2px solid rgba(255,255,255,0.1)', paddingBottom: '10px'}}>Live Bidding</h3>
+                            
+                            {winnerMessage && (
+                                <div className="winner-banner">
+                                    🎉 {winnerMessage}
+                                </div>
+                            )}
+
+                            <div className="bids-container">
+                                {bids.length > 0 ? (
+                                    [...bids].reverse().map((bidData, index) => (
+                                        <div key={index} className="bid-item">
+                                            <span className="bid-user">{bidData.userName}</span>
+                                            <span className="bid-amount">${bidData.amount}</span>
+                                        </div>
+                                    ))
                                 ) : (
-                                    'Join Auction'
+                                    <div style={{textAlign: 'center', padding: '40px', color: '#666'}}>
+                                        <i className="bi bi-hammer" style={{fontSize: '2rem', display: 'block', marginBottom: '10px'}}></i>
+                                        No bids placed yet
+                                    </div>
                                 )}
-                            </button>
-                        )}
-                        {hasJoined && <p className="text-success mt-3"><strong>✓ You have joined this auction</strong></p>}
+                            </div>
+
+                            {auctionStatus === 'Active' && (
+                                <div className="bid-input-group">
+                                    <input
+                                        type="number"
+                                        className="bid-input"
+                                        placeholder="Enter amount..."
+                                        value={bid}
+                                        onChange={(e) => setBid(e.target.value)}
+                                        min={auction.currentPrice ? auction.currentPrice + 1 : 0}
+                                        step="1"
+                                    />
+                                    <button className="btn-place-bid" onClick={sendBid}>
+                                        Place Bid
+                                    </button>
+                                </div>
+                            )}
+                            
+                            {auctionStatus !== 'Active' && !winnerMessage && (
+                                <div style={{textAlign: 'center', marginTop: '20px', color: '#e74c3c'}}>
+                                    Auction is currently inactive
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
