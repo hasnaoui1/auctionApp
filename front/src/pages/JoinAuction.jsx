@@ -3,12 +3,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import axiosInstance from "../services/axiosInstance";
-import "bootstrap/dist/css/bootstrap.min.css";
 import { useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import keycloak from "../services/keycloak";
 
-import "./JoinAuction.css";
 
 export default function JoinAuction() {
     const [auction, setAuction] = useState(null);
@@ -189,117 +187,138 @@ export default function JoinAuction() {
 
     if (!auction) {
         return (
-            <>
+            <div className="min-h-screen bg-slate-50">
                 <Navbar />
-                <div className="loading-spinner"></div>
-            </>
+                <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                </div>
+            </div>
         );
     }
 
     return (
-        <>
+        <div className="min-h-screen bg-slate-50 text-slate-700">
             <Navbar />
-            <div className="auction-container">
-                <div className="auction-card">
-                    <div className="auction-header">
-                        <h1 className="auction-title">{auction.itemName}</h1>
-                        <div style={{marginTop: '10px'}}>
-                            <span className={`status-badge ${auctionStatus === 'Active' ? 'status-active' : 'status-inactive'}`}>
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+                <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+                    <div className="p-6 md:p-10 border-b border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h1 className="text-3xl font-bold text-slate-900 mb-2">{auction.itemName}</h1>
+                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${auctionStatus === 'Active' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
                                 {auctionStatus}
                             </span>
                         </div>
+                        {!hasJoined && (
+                            <button 
+                                onClick={joinAuction}
+                                disabled={loading}
+                                className="w-full md:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold shadow-lg shadow-indigo-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Joining...' : 'Join Auction Now'}
+                            </button>
+                        )}
                     </div>
                     
-                    <div className="auction-body">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
                         {/* Left Column: Details & Participants */}
-                        <div className="info-section">
-                            <h3 style={{marginBottom: '20px', borderBottom: '2px solid rgba(255,255,255,0.1)', paddingBottom: '10px'}}>Auction Details</h3>
-                            
-                            <div className="info-item">
-                                <span className="info-label">Description</span>
-                                <span className="info-value">{auction.description}</span>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Starting Price</span>
-                                <span className="info-value">${auction.startingPrice}</span>
-                            </div>
-                            <div className="info-item">
-                                <span className="info-label">Current Price</span>
-                                <span className="info-value" style={{color: '#4cd137', fontSize: '1.2rem'}}>${auction.currentPrice || auction.startingPrice}</span>
+                        <div className="col-span-2 p-6 md:p-10 space-y-8">
+                            <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                                <h3 className="text-xl font-semibold text-slate-900 mb-4 border-b border-slate-200 pb-2">Auction Details</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <span className="text-slate-500 text-sm block mb-1">Description</span>
+                                        <p className="text-slate-700 leading-relaxed">{auction.description}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <span className="text-slate-500 text-sm block mb-1">Starting Price</span>
+                                            <span className="text-xl font-medium text-slate-700">${auction.startingPrice}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 text-sm block mb-1">Current Price</span>
+                                            <span className="text-2xl font-bold text-emerald-600">${auction.currentPrice || auction.startingPrice}</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div style={{marginTop: '30px'}}>
-                                <h4 style={{color: '#a0a0a0', marginBottom: '15px'}}>Participants ({participants.length})</h4>
-                                <div className="participants-list">
+                            <div>
+                                <h4 className="text-lg font-medium text-slate-600 mb-4 flex items-center">
+                                    Participants 
+                                    <span className="ml-2 bg-slate-200 text-slate-600 text-xs py-0.5 px-2 rounded-full border border-slate-300">{participants.length}</span>
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
                                     {participants.length > 0 ? (
                                         participants.map((participant, index) => (
-                                            <div key={index} className={`participant-chip ${participant === userName ? 'is-me' : ''}`}>
-                                                <i className="bi bi-person-fill"></i>
+                                            <div key={index} className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm border ${participant === userName ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
+                                                <div className="w-2 h-2 rounded-full bg-current mr-2 opacity-75"></div>
                                                 {participant}
                                             </div>
                                         ))
                                     ) : (
-                                        <span style={{color: '#666'}}>No participants yet</span>
+                                        <span className="text-slate-500 italic">No participants yet</span>
                                     )}
                                 </div>
                             </div>
-
-                            {!hasJoined && (
-                                <button 
-                                    className="join-btn-large" 
-                                    onClick={joinAuction}
-                                    disabled={loading}
-                                >
-                                    {loading ? 'Joining...' : 'Join Auction Now'}
-                                </button>
-                            )}
                         </div>
 
                         {/* Right Column: Bids & Actions */}
-                        <div className="action-section">
-                            <h3 style={{marginBottom: '20px', borderBottom: '2px solid rgba(255,255,255,0.1)', paddingBottom: '10px'}}>Live Bidding</h3>
+                        <div className="p-6 md:p-10 flex flex-col h-full min-h-[500px]">
+                            <h3 className="text-xl font-semibold text-slate-900 mb-6 flex items-center">
+                                <svg className="w-5 h-5 mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                Live Bidding
+                            </h3>
                             
                             {winnerMessage && (
-                                <div className="winner-banner">
-                                    🎉 {winnerMessage}
+                                <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 text-center animate-pulse">
+                                    <p className="text-amber-700 font-bold text-lg">🎉 {winnerMessage}</p>
                                 </div>
                             )}
 
-                            <div className="bids-container">
+                            <div className="flex-1 overflow-y-auto max-h-[400px] mb-6 space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
                                 {bids.length > 0 ? (
                                     [...bids].reverse().map((bidData, index) => (
-                                        <div key={index} className="bid-item">
-                                            <span className="bid-user">{bidData.userName}</span>
-                                            <span className="bid-amount">${bidData.amount}</span>
+                                        <div key={index} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
+                                            <span className="text-slate-600 font-medium">{bidData.userName}</span>
+                                            <span className="text-emerald-600 font-bold font-mono">${bidData.amount}</span>
                                         </div>
                                     ))
                                 ) : (
-                                    <div style={{textAlign: 'center', padding: '40px', color: '#666'}}>
-                                        <i className="bi bi-hammer" style={{fontSize: '2rem', display: 'block', marginBottom: '10px'}}></i>
-                                        No bids placed yet
+                                    <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-3">
+                                        <div className="p-4 rounded-full bg-slate-100">
+                                            <svg className="w-8 h-8 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                        <p>No bids placed yet</p>
                                     </div>
                                 )}
                             </div>
 
-                            {auctionStatus === 'Active' && (
-                                <div className="bid-input-group">
-                                    <input
-                                        type="number"
-                                        className="bid-input"
-                                        placeholder="Enter amount..."
-                                        value={bid}
-                                        onChange={(e) => setBid(e.target.value)}
-                                        min={auction.currentPrice ? auction.currentPrice + 1 : 0}
-                                        step="1"
-                                    />
-                                    <button className="btn-place-bid" onClick={sendBid}>
-                                        Place Bid
-                                    </button>
+                            {auctionStatus === 'Active' ? (
+                                <div className="mt-auto pt-6 border-t border-slate-200">
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="number"
+                                            className="flex-1 bg-slate-50 border border-slate-300 text-slate-900 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-400 transition-all shadow-inner"
+                                            placeholder="Enter amount..."
+                                            value={bid}
+                                            onChange={(e) => setBid(e.target.value)}
+                                            min={auction.currentPrice ? auction.currentPrice + 1 : 0}
+                                            step="1"
+                                        />
+                                        <button 
+                                            onClick={sendBid}
+                                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-lg font-semibold shadow-lg shadow-emerald-600/20 transition-all hover:-translate-y-0.5"
+                                        >
+                                            Place Bid
+                                        </button>
+                                    </div>
                                 </div>
-                            )}
-                            
-                            {auctionStatus !== 'Active' && !winnerMessage && (
-                                <div style={{textAlign: 'center', marginTop: '20px', color: '#e74c3c'}}>
+                            ) : !winnerMessage && (
+                                <div className="mt-auto pt-6 border-t border-slate-200 text-center text-red-600 bg-red-50 p-4 rounded-lg border border-red-100">
                                     Auction is currently inactive
                                 </div>
                             )}
@@ -307,6 +326,6 @@ export default function JoinAuction() {
                     </div>
                 </div>
             </div>
-        </>
+        </div>
     );
 }

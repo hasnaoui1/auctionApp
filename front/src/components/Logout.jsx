@@ -13,9 +13,10 @@ export default function Logout() {
   }, []);
 
   return (
-    <div className="d-flex justify-content-center align-items-center vh-100">
-      <div className="spinner-border text-primary" role="status">
-        <span className="visually-hidden">Logging out...</span>
+    <div className="flex min-h-screen items-center justify-center bg-slate-950">
+      <div className="flex flex-col items-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-indigo-500"></div>
+        <p className="mt-4 text-slate-400">Logging out...</p>
       </div>
     </div>
   );

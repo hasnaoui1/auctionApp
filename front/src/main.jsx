@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import keycloak from "./services/keycloak";
+import "./index.css";
 
 keycloak
   .init({ onLoad: "check-sso", checkLoginIframe: false }) 

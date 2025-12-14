@@ -47,8 +47,11 @@ axiosInstance.interceptors.response.use(
                 originalRequest.headers.Authorization = `Bearer ${keycloak.token}`;
                 return axiosInstance(originalRequest);
             } catch (refreshError) {
-                // If refresh fails, redirect to login
-                keycloak.login();
+                // If refresh fails, redirect to local login page
+                console.warn('Token refresh failed, redirecting to login');
+                localStorage.removeItem('token');
+                window.location.href = '/auth/signin';
+
                 return Promise.reject(refreshError);
             }
         }
